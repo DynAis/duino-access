@@ -1,4 +1,4 @@
-/* FPID Test Code
+/* DuinoAccess-MainCode
    by: Dynais
    date: 2020-08-14
    messages: 修改下方参数调整区域内的宏定义达到基本的参数调整

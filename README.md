@@ -12,4 +12,4 @@
 | fpmComm   | 模块命令API              |
 | hzDevice  | 串口通信底层             |
 | pinDef    | 主板引脚定义             |
-| hzTypes.h | 数据类型定义             |
+| hzTypes   | 数据类型定义             |
