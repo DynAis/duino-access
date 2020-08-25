@@ -14,23 +14,44 @@
 #define ARDUINO_BAUD 57600                          //Arduino USB串口通信波特率
 #define DASTATE 2                                   //调整参数以更改整体功能
 
-extern UINT8 fpState;
-extern UINT8 sigState;
-extern CRGB signal_leds[];
+extern UINT8 sigState;  //信号灯标志位
+extern CRGB signal_leds[];  
+extern UINT8 fpState; //指纹检测标志位
+UINT8 prevFpState;  //前一次指纹检测标志位
+UINT8 retval; //返回信息标志位
+UINT8 prevRetval; //前一次返回信息标志位
 
-UINT8 prevFpState;
-UINT8 retval;
-UINT8 prevRetval;
-
-//定时中断内函数，处理指示灯光
+//指示灯光中断处理
 void process()
 {
   //灯光处理
   updateSignal(sigState);
 }
 
-//初始化函数
-static void initialize(void)
+//串口输出指纹模块信息
+void getFpInfo(){
+      ST_DEV_INFO_HOZO info;
+      retval = fpmGetDeviceInfo(&info);
+      Serial.print("当前波特率: ");
+      Serial.println(info.baudrate);
+      Serial.print("当前已注册指纹量: ");
+      Serial.println(info.enrollCount);
+      Serial.print("总指纹容纳量: ");
+      Serial.println(info.maxCount);
+      Serial.print("当前设备签名信息: ");
+      Serial.println(info.signature);
+      Serial.print("指纹采样数量: ");
+      Serial.println(info.sampleSize);
+      Serial.print("指纹识别门槛等级: ");
+      Serial.println(info.matchingThreshold);
+      Serial.print("指纹唯一性限制: ");
+      Serial.println(info.uniqueConstrain);
+      Serial.print("指纹严格模式: ");
+      Serial.println(info.strictEnrollment);
+}
+
+//初始化
+static void initialize()
 {
   //引脚初始化
   pinMode(PIN_FP_RST, OUTPUT);
@@ -79,13 +100,15 @@ void loop()
 //  signal：检测到有手指时，亮绿灯，没有手指时不亮灯
 //  
 //******************************************************************//
-  case DA_STATE_PRESSTEST: //手指按压测试功能
+  case DA_STATE_PRESSTEST: 
     //检测手指
     retval = fpmDetectFinger(NULL);
+    //通过对比前一次指纹探测状态是否跳变来控制灯光标志位的变化
     if (prevRetval == HZERR_NO_FINGER && retval == HZERR_SUCCESS)
       sigState = SIG_STATE_SUCCESS;
     else if (retval == HZERR_NO_FINGER && prevRetval == HZERR_SUCCESS)
       sigState = SIG_STATE_SLEEP;
+    //结束后重新复制
     prevRetval = retval;
     delay(100);
     break;
@@ -96,19 +119,21 @@ void loop()
 //          如果手指长时间未移开，亮橙色灯示意，成功完成一次录入亮绿灯，重复
 //******************************************************************//
 
-  case DA_STATE_ENROLL: // 指纹注册功能
+  case DA_STATE_ENROLL: 
     Serial.println("--- start enroll finger ---");
     fpState = FP_STATE_START;
     sigState = SIG_STATE_SLEEP;
-    //按压时间相关
+    //设置指纹过长防止提醒时间
     UINT32 warningPressTime;
     delay(2000);
+    //进入注册循环
     while (1)
     {
       prevFpState = fpState; //保存前一次状态
       Serial.println("in fpenroll");
       fpEnroll();
-      // excute the INDICATION according to the fpState
+
+      // 根据指纹标志位来判断当前状态
       switch (fpState)
       {
       case FP_STATE_WAIT_FINGER_OFF2ENROLL:
@@ -118,7 +143,7 @@ void loop()
         {
           Serial.println("--- please release your finger ---");
           if (prevFpState != fpState)
-            //状态转换时记录一次时间
+            //状态转换时记录一次时间，用来判断手指过长时间放置
             warningPressTime = getEndTime(3000);
           sigState = SIG_STATE_PROCESSING;
         }
@@ -140,7 +165,7 @@ void loop()
           sigState = SIG_STATE_WAITTING;
         break;
       }
-      // one finger enrollment is finished
+      //一次指纹录入结束
       if (FP_STATE_DEFAULT == fpState)
       {
         if (prevFpState != fpState)
@@ -162,27 +187,30 @@ void loop()
 //          亮红灯
 //******************************************************************//
 
-  case DA_STATE_DETECT: // 验证指纹功能(最后留这一个)
+  case DA_STATE_DETECT: 
     Keyboard.begin();
-    //时间处理
     UINT32 cdEndTime = getCurTime();
     while (1)
     {
-      retval = fpIdentify();
+      retval = fpIdentify(); //身份验证
+      //验证成功
       if (HZERR_SUCCESS == retval)
       {
         sigState = SIG_STATE_SUCCESS;
+        //两次成功的验证之间不得小于指定时间
         if(cdEndTime < getCurTime()){
           Keyboard.println(PASSWORD);
           Serial.println("--- identify successed ---");
           cdEndTime = getEndTime(DETECT_PAUSE);
         }
       }
+      //验证失败
       else if (HZERR_NO_FINGER != retval)
       {
         sigState = SIG_STATE_FAILED;
         Serial.println("--- identify failed ---");
       }
+      //休眠
       else
       {
         sigState = SIG_STATE_SLEEP;
@@ -192,36 +220,19 @@ void loop()
     break;
 
 //******************************************************************//
-//  usage：查看硬件信息
+//  usage：查看硬件信息,使用时需要配合指纹模块摁手指才能输出到串口
 //  signal：无
 //******************************************************************//
 
-  case DA_STATE_INFO: //摁下指纹,输出硬件信息功能
+  case DA_STATE_INFO: 
     retval = fpmDetectFinger(NULL);
     if (retval == HZERR_SUCCESS)
     {
-      success();
-      ST_DEV_INFO_HOZO info;
-      retval = fpmGetDeviceInfo(&info);
-      Serial.print("当前波特率: ");
-      Serial.println(info.baudrate);
-      Serial.print("当前已注册指纹量: ");
-      Serial.println(info.enrollCount);
-      Serial.print("总指纹容纳量: ");
-      Serial.println(info.maxCount);
-      Serial.print("当前设备签名信息: ");
-      Serial.println(info.signature);
-      Serial.print("指纹采样数量: ");
-      Serial.println(info.sampleSize);
-      Serial.print("指纹识别门槛等级: ");
-      Serial.println(info.matchingThreshold);
-      Serial.print("指纹唯一性限制: ");
-      Serial.println(info.uniqueConstrain);
-      Serial.print("指纹严格模式: ");
-      Serial.println(info.strictEnrollment);
+      sigState = SIG_STATE_SUCCESS;
+      getFpInfo();
       delay(2000);
     }
-
+    sigState = SIG_STATE_SLEEP;
     break;
 
 //******************************************************************//
@@ -236,7 +247,11 @@ void loop()
     while (1)
       ;
     break;
-
+    
+//******************************************************************//
+//  usage：无
+//  signal：无
+//******************************************************************//
   default:
     break;
   }
