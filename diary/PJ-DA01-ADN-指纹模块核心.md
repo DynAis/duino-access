@@ -55,7 +55,7 @@
 
 首先，如果你安装失败了，请先卸载原来的安装失败的 PlatformIO ，重启 VSCode，之后在VSCode的终端里输入
 
-`sudo pip --no-cache-dir install -U platformio`
+`pip --no-cache-dir install -U platformio`
 
 等待他安装完成，重启VSCode，重新去商店点一下安装，就可以顺利的装上了
 

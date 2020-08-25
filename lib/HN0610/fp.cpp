@@ -1,6 +1,6 @@
 #include "fpmComm.h"
 #include "fp.h"
-#include "pinDef.h"
+#include "fpPinDef.h"
 #include "Arduino.h"
 // #include "hzGpio.h"
 // #include "hzMisc.h"

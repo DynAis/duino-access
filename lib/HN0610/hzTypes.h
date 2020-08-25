@@ -13,7 +13,7 @@ typedef	float					T_FLOAT;
 
 typedef unsigned char           UINT8;       /* unsigned 8 bit integer */
 typedef unsigned short          UINT16;      /* unsigned 16 bit integer */
-typedef unsigned long            UINT32;      /* unsigned 32 bit integer */
+typedef unsigned long           UINT32;      /* unsigned 32 bit integer */
 typedef signed char             INT8;       /* signed 8 bit integer */
 typedef signed short            INT16;      /* signed 16 bit integer */
 typedef signed long             INT32;      /* signed 32 bit integer */

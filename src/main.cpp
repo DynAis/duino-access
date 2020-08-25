@@ -10,14 +10,29 @@
 
 //参数调整
 #define PASSWORD "44687E64A8E2557DF7CFA83C989A4627" //这里填上你的密码
-#define DETECT_PAUSE 1000                           //连续检测间隔 in ms
+#define DETECT_PAUSE 1600                           //连续检测间隔 in ms
 #define ARDUINO_BAUD 57600                          //Arduino usb串口通信波特率
-#define DASTATE 2                                   //模块实现功能调整
+#define DASTATE 0                                   //模块实现功能调整
+// #define SIG_MAX_BRIGHTNESS 50                    //指示灯最大亮度(1-255)
 
 extern UINT8 fpState;
+extern UINT8 sigState;
+extern CRGB signal_leds[];
+
 UINT8 prevFpState;
 UINT8 retval;
+// //设置cd
+// bool cd = true;
+// UINT32 cdEndTime = getCurTime();
 
+
+// //定时中断函数，处理指示灯光
+// void ledProcess(){
+//   sigState = updateSignal(sigState);
+//   FastLED.show();
+// }
+
+//初始化函数
 static void initialize(void)
 {
   //引脚初始化
@@ -36,12 +51,21 @@ static void initialize(void)
   {
     debug();
   }
+
+  //WS2812灯光初始化
+  sigInit();
+
+  // //定时器中断初始化
+  // MsTimer2::set(16, ledProcess);
+  // //开始计时
+  // MsTimer2::start(); 
 }
 
+//初始化函数
 void setup()
 {
   initialize();
-  // wake up fpm
+  // 唤醒指纹模块
   Serial.println("in WakeUP");
   while (fpWakeup())
   {
@@ -51,14 +75,32 @@ void setup()
 
 void loop()
 {
+  //指示灯计时器控制
+  EVERY_N_MILLISECONDS(16){ //60fps
+    sigState = updateSignal(sigState);
+    FastLED.show();
+  }
+
   switch (DASTATE)
   {
 
   case DA_STATE_PRESSTEST: //检测手指按压测试
-    retval = fpmDetectFinger(NULL);
-    Serial.println(retval, HEX);
-    if (retval == HZERR_SUCCESS)
-      success();
+    // //检测cd
+    // if(cdEndTime<getCurTime()){
+    //   cd = true;
+    // }
+    // if(cd){
+    //   //cd重置
+    //   cd = false;
+    //   cdEndTime = getEndTime(DETECT_PAUSE);
+      //检测手指
+      retval = fpmDetectFinger(NULL);
+      if (retval == HZERR_SUCCESS)
+      {
+        //下面是测试代码
+        sigState = SIG_STATE_SUCCESS;
+      }
+    // }
     break;
 
   case DA_STATE_ENROLL: // 指纹注册
@@ -112,6 +154,7 @@ void loop()
         Serial.println("--- identify successed ---");
         delay(DETECT_PAUSE);
       }
+
       else if (HZERR_NO_FINGER != retval)
       {
         debug();
