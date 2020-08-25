@@ -13,7 +13,6 @@
 #define DETECT_PAUSE 1600                           //连续检测间隔 in ms
 #define ARDUINO_BAUD 57600                          //Arduino usb串口通信波特率
 #define DASTATE 0                                   //模块实现功能调整
-// #define SIG_MAX_BRIGHTNESS 50                    //指示灯最大亮度(1-255)
 
 extern UINT8 fpState;
 extern UINT8 sigState;
@@ -21,33 +20,36 @@ extern CRGB signal_leds[];
 
 UINT8 prevFpState;
 UINT8 retval;
-// //设置cd
-// bool cd = true;
-// UINT32 cdEndTime = getCurTime();
+UINT8 prevRetval;
 
-
-// //定时中断函数，处理指示灯光
-// void ledProcess(){
-//   sigState = updateSignal(sigState);
-//   FastLED.show();
-// }
+//定时中断内函数，处理指示灯光
+void process()
+{
+  //灯光处理
+  updateSignal(sigState);
+}
 
 //初始化函数
 static void initialize(void)
 {
   //引脚初始化
   pinMode(PIN_FP_RST, OUTPUT);
-  // digitalWrite(PIN_FP_RST,HIGH);
-  // pinMode(PIN_FP_INT,INPUT);
 
   //串口初始化
   Serial.begin(ARDUINO_BAUD); //This pipes to the serial monitor
   Serial1.begin(57600);       //This is the UART, pipes to sensors attached to board
   delay(100);
 
-  //硬件初始化
+  //指纹模块初始化
   Serial.println("in Init");
   while (fpInit())
+  {
+    debug();
+  }
+
+  //唤醒指纹模块
+  Serial.println("in WakeUP");
+  while (fpWakeup())
   {
     debug();
   }
@@ -55,55 +57,35 @@ static void initialize(void)
   //WS2812灯光初始化
   sigInit();
 
-  // //定时器中断初始化
-  // MsTimer2::set(16, ledProcess);
-  // //开始计时
-  // MsTimer2::start(); 
+  //定时器中断初始化
+  MsTimer2::set(16, process);
+  //开始计时
+  MsTimer2::start();
 }
 
-//初始化函数
 void setup()
 {
   initialize();
-  // 唤醒指纹模块
-  Serial.println("in WakeUP");
-  while (fpWakeup())
-  {
-    debug();
-  }
 }
 
 void loop()
 {
-  //指示灯计时器控制
-  EVERY_N_MILLISECONDS(16){ //60fps
-    sigState = updateSignal(sigState);
-    FastLED.show();
-  }
 
   switch (DASTATE)
   {
-
-  case DA_STATE_PRESSTEST: //检测手指按压测试
-    // //检测cd
-    // if(cdEndTime<getCurTime()){
-    //   cd = true;
-    // }
-    // if(cd){
-    //   //cd重置
-    //   cd = false;
-    //   cdEndTime = getEndTime(DETECT_PAUSE);
-      //检测手指
-      retval = fpmDetectFinger(NULL);
-      if (retval == HZERR_SUCCESS)
-      {
-        //下面是测试代码
-        sigState = SIG_STATE_SUCCESS;
-      }
-    // }
+  case DA_STATE_PRESSTEST: //手指按压测试功能
+    //检测手指
+    retval = fpmDetectFinger(NULL);
+    if(prevRetval==HZERR_NO_FINGER && retval == HZERR_SUCCESS)
+      sigState = SIG_STATE_SUCCESS;
+    else if (retval==HZERR_NO_FINGER && prevRetval == HZERR_SUCCESS)
+      sigState = SIG_STATE_SLEEP;
+    // Serial.println(retval);
+    prevRetval = retval;
+    delay(100);
     break;
 
-  case DA_STATE_ENROLL: // 指纹注册
+  case DA_STATE_ENROLL: // 指纹注册功能
     Serial.println("--- start enroll finger ---");
     fpState = FP_STATE_START;
     while (1)
@@ -142,7 +124,7 @@ void loop()
     }
     break;
 
-  case DA_STATE_DETECT: // 验证指纹测试(最后留这一个)
+  case DA_STATE_DETECT: // 验证指纹功能(最后留这一个)
     Keyboard.begin();
     while (1)
     {
@@ -165,7 +147,7 @@ void loop()
     Keyboard.end();
     break;
 
-  case DA_STATE_INFO: //摁下指纹输出硬件信息
+  case DA_STATE_INFO: //摁下指纹,输出硬件信息功能
     retval = fpmDetectFinger(NULL);
     if (retval == HZERR_SUCCESS)
     {
@@ -188,14 +170,12 @@ void loop()
       Serial.println(info.uniqueConstrain);
       Serial.print("指纹严格模式: ");
       Serial.println(info.strictEnrollment);
-      // Serial.print("retval:");
-      // Serial.println(retval);
       delay(2000);
     }
 
     break;
 
-  case DA_STATE_CLEAR: //清除所有指纹信息
+  case DA_STATE_CLEAR: //清除所有指纹信息功能
     retval = fpDeleteAll();
     Serial.print("尝试清除所有指纹信息: ");
     Serial.println(retval);

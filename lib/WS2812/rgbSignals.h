@@ -21,4 +21,4 @@ UINT8 sigFailed(UINT8 frame);
 UINT8 sigWaitting(UINT8 frame);
 UINT8 sigWarning(UINT8 frame);
 UINT8 sigLoading(UINT8 frame);
-UINT8 sigSleep(void);
+UINT8 sigSleep(UINT8 frame);
