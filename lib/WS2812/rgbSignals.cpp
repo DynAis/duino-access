@@ -46,11 +46,15 @@ UINT8 updateSignal(UINT8 sigState)
   case SIG_STATE_LOADING:
     sigLoading(frame);
     break;
+  case SIG_STATE_PROCESSING:
+    sigProcessing(frame);
+    break;
   case SIG_STATE_SLEEP:
     sigSleep(frame);
     break;
   default:
     fill_solid(signal_leds, NUM_LEDS, CRGB::Black);
+    FastLED.show();
     break;
   }
   frame++;
@@ -96,6 +100,15 @@ UINT8 sigWarning(UINT8 frame)
 UINT8 sigLoading(UINT8 frame)
 {
   fill_solid(signal_leds, NUM_LEDS, COL_WAITING);
+  brightness = BRIGHT_TABLE[frameMap(frame, 1, 15, 0, 255)];
+  FastLED.setBrightness(brightness);
+  FastLED.show();
+  // Serial.println(brightness);
+  return 0;
+}
+UINT8 sigProcessing(UINT8 frame)
+{
+  fill_solid(signal_leds, NUM_LEDS, COL_PROCESSING);
   brightness = BRIGHT_TABLE[frameMap(frame, 1, 15, 0, 255)];
   FastLED.setBrightness(brightness);
   FastLED.show();
