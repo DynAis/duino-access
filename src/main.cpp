@@ -7,6 +7,7 @@
 //头文件
 #include "DAinclude.h"
 #include "DAstate.h"
+#include <avr/sleep.h>
 
 //参数调整
 #define PASSWORD "44687E64A8E2557DF7CFA83C989A4627" //在这里填上你的密码
@@ -16,11 +17,11 @@
 
 extern UINT8 sigState; //信号灯标志位
 extern CRGB signal_leds[];
-extern UINT8 fpState; //指纹检测标志位
-UINT8 prevFpState;    //前一次指纹检测标志位
-UINT8 retval;         //返回信息标志位
-UINT8 prevRetval;     //前一次返回信息标志位
-volatile bool ifFpAwake;         //休眠标志位
+extern UINT8 fpState;    //指纹检测标志位
+UINT8 prevFpState;       //前一次指纹检测标志位
+UINT8 retval;            //返回信息标志位
+UINT8 prevRetval;        //前一次返回信息标志位
+volatile bool ifFpAwake; //休眠标志位
 
 //指示灯光定时器中断处理
 void sigProcess()
@@ -30,9 +31,11 @@ void sigProcess()
 }
 
 //指纹模块唤醒外部中断处理
-void fpAwake(){
+void fpAwake()
+{
   ifFpAwake = true;
-  // fpWakeup();
+  // sleep_disable();
+  // detachInterrupt(digitalPinToInterrupt(7));
 }
 
 //串口输出指纹模块信息
@@ -77,12 +80,12 @@ static void initialize()
   MsTimer2::set(16, sigProcess);
   //开始计时
   MsTimer2::start();
-  
+
   //指纹模块初始化
   Serial.println("in Init");
   while (fpInit())
   {
-    Serial.println(fpInit(),HEX);
+    Serial.println(fpInit(), HEX);
     sigState = SIG_STATE_FAILED;
     debug();
   }
@@ -91,7 +94,7 @@ static void initialize()
   Serial.println("in WakeUP");
   while (fpWakeup())
   {
-    Serial.println(fpWakeup(),HEX);
+    Serial.println(fpWakeup(), HEX);
     sigState = SIG_STATE_FAILED;
     debug();
   }
@@ -99,6 +102,9 @@ static void initialize()
 
   //外部中断初始化
   attachInterrupt(digitalPinToInterrupt(7), fpAwake, RISING);
+
+  //蓝牙模块初始化
+  btInit();
 }
 
 void setup()
@@ -129,9 +135,14 @@ void loop()
     retval = fpmDetectFinger(NULL);
     //通过对比前一次指纹探测状态是否跳变来控制灯光标志位的变化
     if (prevRetval == HZERR_NO_FINGER && retval == HZERR_SUCCESS)
+    {
       sigState = SIG_STATE_SUCCESS;
+      // btSendPassworld(PASSWORD);
+    }
     else if (retval == HZERR_NO_FINGER && prevRetval == HZERR_SUCCESS)
+    {
       sigState = SIG_STATE_SLEEP;
+    }
     //结束后重新复制
     prevRetval = retval;
     delay(100);
@@ -218,8 +229,8 @@ void loop()
     UINT32 awakeEndTime = getEndTime(30000);
     while (1)
     {
-      if (ifFpAwake)  //只有指纹模块不休眠的时候才进入验证
-      {   
+      if (ifFpAwake) //只有指纹模块不休眠的时候才进入验证
+      {
         retval = fpIdentify(); //身份验证
         //验证成功
         if (HZERR_SUCCESS == retval)
@@ -231,10 +242,12 @@ void loop()
             Keyboard.begin();
             Keyboard.println(PASSWORD);
             Keyboard.end();
-            Serial.println("--- identify successed ---");
+
+            btSendPassworld(PASSWORD);
+            // Serial.println("--- identify successed ---");
             cdEndTime = getEndTime(DETECT_PAUSE);
           }
-          fpUpdate(); //完善指纹数据
+          fpUpdate();                       //完善指纹数据
           awakeEndTime = getEndTime(30000); //识别到指纹就刷新休眠倒计时
         }
         //验证失败
@@ -251,9 +264,16 @@ void loop()
         }
 
         //30s没有检测到手指指纹模块就进入休眠
-        if(awakeEndTime < getCurTime() && ifFpAwake){
-            fpmSetSleepMode(0x03, NULL);
-            ifFpAwake = false;
+        if (awakeEndTime < getCurTime() && ifFpAwake)
+        {
+          //指纹模块休眠
+          fpmSetSleepMode(0x03, NULL);
+          ifFpAwake = false;
+          // //Arduino休眠
+          // set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+          // delay(500);
+          // // sleep_cpu();
+          // sleep_mode();
         }
       }
     }

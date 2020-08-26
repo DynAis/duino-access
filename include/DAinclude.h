@@ -5,3 +5,4 @@
 #include "MsTimer2.h"
 #include "hn0610.h"
 #include "ws2812.h"
+#include "xm04hidk.h"
