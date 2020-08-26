@@ -301,8 +301,8 @@ UINT8 fpmGetParam(UINT32 *param, UINT8 *rollingKey)
 UINT8 fpmSetParam(UINT32 param, UINT8 *rollingKey)
 {
     UINT8 retval;
-
-    retval = fpmCommand(HZ_SET_PARAM, 0, param, NULL, NULL, NULL, TIMEOUT_LONG, rollingKey);
+    //使用0x55来暂时修改参数
+    retval = fpmCommand(HZ_SET_PARAM, 0x55, param, NULL, NULL, NULL, TIMEOUT_LONG, rollingKey);
     return retval;
 }
 
