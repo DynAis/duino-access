@@ -105,6 +105,9 @@ static void initialize()
 
   //蓝牙模块初始化
   btInit();
+
+  //USB检测
+  USBCON|=(1<<OTGPADE); //enables VBUS pad
 }
 
 void setup()
@@ -239,11 +242,14 @@ void loop()
           //两次成功的验证之间不得小于指定时间
           if (cdEndTime < getCurTime())
           {
-            Keyboard.begin();
-            Keyboard.println(PASSWORD);
-            Keyboard.end();
-
-            btSendPassworld(PASSWORD);
+            if(USBSTA&(1<<VBUS)){  //checks state of VBUS
+              Keyboard.begin();
+              Keyboard.println(PASSWORD);
+              Keyboard.end();
+            }
+            else{
+              btSendPassworld(PASSWORD);
+            }
             // Serial.println("--- identify successed ---");
             cdEndTime = getEndTime(DETECT_PAUSE);
           }
